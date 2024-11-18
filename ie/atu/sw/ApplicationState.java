@@ -29,4 +29,17 @@ public class ApplicationState {
     public static String getEmbeddingsFilePath() {
         return embeddingsFilePath;
     }
+
+    private static String outputFilePath = "./out.txt"; // Default path
+
+    // Sets the output file path
+    public static void setOutputFilePath(String path) {
+        outputFilePath = path;
+    }
+
+    // Retrieves the output file path
+    public static String getOutputFilePath() {
+        return outputFilePath;
+    }
+
 }

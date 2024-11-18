@@ -1,5 +1,8 @@
 package ie.atu.sw;
 
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.concurrent.Executors;
@@ -7,6 +10,11 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.StructuredTaskScope;
 
 public class Runner {
+
+    // Global variables for threads and clusters configuration
+    private static int numberOfThreads = 0;
+    private static int numberOfClusters = 0;
+    private static boolean isConfigured = false; // Tracks if Option 4 has been executed
 
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
@@ -43,22 +51,19 @@ public class Runner {
                         break;                
                     case 3:
                         System.out.println("Enter the output file path (default: ./out.txt):");
-                        String outputFile = scanner.nextLine();
-                        if (outputFile.isEmpty()) {
-                            outputFile = "./out.txt";  // Default file path
+                        String outputFilePath = scanner.nextLine();
+                        if (outputFilePath.isEmpty()) {
+                            outputFilePath = "./out.txt"; // Default output file
                         }
-                        System.out.println("You selected: " + outputFile);
+                        // Save the file path to the application state
+                        ApplicationState.setOutputFilePath(outputFilePath);
+                        System.out.println("Output file path set to: " + outputFilePath);
                         break;
                     case 4:
-                        System.out.println("Enter the number of threads:");
-                        int numThreads = scanner.nextInt();
-                        System.out.println("Enter the number of clusters:");
-                        int numClusters = scanner.nextInt();
-                        scanner.nextLine(); // consume the newline character
-                        System.out.println("You selected: Threads = " + numThreads + ", Clusters = " + numClusters);
+                        configureThreadsAndClusters(scanner);
                         break;
                     case 5:
-                        System.out.println("Building clusters...");
+                        buildClusters();
                         break;
                     case 0:
                         exit = true;
@@ -79,6 +84,59 @@ public class Runner {
         } // ExecutorService is automatically closed here
 
         scanner.close();
+    }
+
+    private static void configureThreadsAndClusters(Scanner scanner) {
+        System.out.println("Enter the number of threads:");
+        numberOfThreads = scanner.nextInt();
+        System.out.println("Enter the number of clusters:");
+        numberOfClusters = scanner.nextInt();
+        scanner.nextLine(); // consume the newline character
+
+        isConfigured = true;
+        System.out.println("Configuration saved: Threads = " + numberOfThreads + ", Clusters = " + numberOfClusters);
+    }
+
+    private static void buildClusters() {
+        if (!isConfigured) {
+            System.out.println("Please configure threads and clusters first using Option 4.");
+            return;
+        }
+
+        System.out.println("Building clusters...");
+        String outputFilePath = ApplicationState.getOutputFilePath();
+
+        try {
+            clusterAndSaveResults(outputFilePath);
+            System.out.println("Clustering results saved to " + outputFilePath);
+        } catch (IOException e) {
+            System.err.println("Failed to save clustering results: " + e.getMessage());
+        }
+    }
+
+    private static void clusterAndSaveResults(String outputPath) throws IOException {
+        // Simulate clustering logic
+        String clusteringResults = performClustering(numberOfThreads, numberOfClusters);
+
+        // Write results to the file
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(outputPath))) {
+            writer.write(clusteringResults);
+        }
+    }
+
+    private static String performClustering(int threads, int clusters) {
+        // Mock implementation of clustering logic
+        StringBuilder result = new StringBuilder();
+        result.append("Clustering completed with ").append(threads).append(" threads\n");
+        result.append("Clusters formed: ").append(clusters).append("\n");
+        result.append("Cluster results:\n");
+
+        // Mock cluster data
+        for (int i = 1; i <= clusters; i++) {
+            result.append("Cluster ").append(i).append(": [Sample Data]\n");
+        }
+
+        return result.toString();
     }
 
     private static void handleEmbeddingsLoading(Scanner scanner, ExecutorService executor) {
@@ -125,34 +183,14 @@ public class Runner {
                 String foundWord = searchWordInput;
                 float[] embedding = null;
                 
-                // Debug print
-                System.out.println("Searching for word: '" + searchWordInput + "'");
-                System.out.println("Total embeddings available: " + wordEmbeddings.size());
-                
                 // Try exact match first
                 embedding = wordEmbeddings.get(searchWordInput);
                 
                 // If no exact match, try case-insensitive search
                 if (embedding == null) {
-                    System.out.println("No exact match found, trying case-insensitive search...");
                     String lowerSearchWord = searchWordInput.toLowerCase();
                     for (Map.Entry<String, float[]> entry : wordEmbeddings.entrySet()) {
                         if (entry.getKey().toLowerCase().equals(lowerSearchWord)) {
-                            embedding = entry.getValue();
-                            foundWord = entry.getKey();
-                            System.out.println("Found case-insensitive match: " + foundWord);
-                            break;
-                        }
-                    }
-                }
-                
-                // If still no match, try as substring
-                if (embedding == null) {
-                    System.out.println("No exact or case-insensitive match found, checking if word exists as part of other words...");
-                    String lowerSearchWord = searchWordInput.toLowerCase();
-                    for (Map.Entry<String, float[]> entry : wordEmbeddings.entrySet()) {
-                        if (entry.getKey().toLowerCase().contains(lowerSearchWord)) {
-                            System.out.println("Found as part of word: " + entry.getKey());
                             embedding = entry.getValue();
                             foundWord = entry.getKey();
                             break;
@@ -174,7 +212,6 @@ public class Runner {
                 System.out.println("Vector dimension: " + result.embedding().length);
             } else {
                 System.out.println("The word '" + result.word() + "' was not found in the embeddings.");
-                System.out.println("Try another word or check the spelling.");
             }
             
         } catch (InterruptedException e) {
@@ -182,11 +219,9 @@ public class Runner {
             Thread.currentThread().interrupt();
         } catch (Exception e) {
             System.err.println("Error while searching for the word: " + e.getMessage());
-            e.printStackTrace();
         }
     }
 
-    // Record to hold search results
     private record SearchResult(String word, float[] embedding) {}
 
     private static String arrayToString(float[] array) {
