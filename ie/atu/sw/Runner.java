@@ -3,6 +3,7 @@ package ie.atu.sw;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.concurrent.Executors;
@@ -115,29 +116,45 @@ public class Runner {
     }
 
     private static void clusterAndSaveResults(String outputPath) throws IOException {
-        // Simulate clustering logic
-        String clusteringResults = performClustering(numberOfThreads, numberOfClusters);
-
-        // Write results to the file
+        if (!ApplicationState.hasWordEmbeddings()) {
+            System.out.println("No word embeddings loaded. Please load embeddings first.");
+            return;
+        }
+    
+        // Get word embeddings
+        Map<String, float[]> wordEmbeddings = ApplicationState.getWordEmbeddings();
+    
+        // Perform clustering
+        KMeansClustering clustering = new KMeansClustering(wordEmbeddings, numberOfClusters);
+        KMeansClustering.ClusteringResult result = clustering.performClustering();
+    
+        // Write results to file
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(outputPath))) {
-            writer.write(clusteringResults);
+            // Write clustering results
+            writer.write("Clustering results:\n");
+            List<List<KMeansClustering.WordWithDistance>> clusters = result.getClusters();
+            List<float[]> centroids = result.getCentroids();
+    
+            for (int i = 0; i < clusters.size(); i++) {
+                writer.write("- Cluster " + (i + 1) + ": \n");
+                for (KMeansClustering.WordWithDistance wordDetail : clusters.get(i)) {
+                    writer.write(String.format("  - %s (Distance: %.6f)\n", 
+                        wordDetail.getWord(), 
+                        wordDetail.getDistance()));
+                }
+            }
+    
+            // Write cluster centroids
+            writer.write("\nCluster centroids:\n");
+            for (int i = 0; i < centroids.size(); i++) {
+                writer.write("- Cluster " + (i + 1) + " Centroid (average vector): " 
+                    + arrayToString(centroids.get(i)) + "\n");
+            }
         }
+    
+        System.out.println("Clustering results saved to " + outputPath);
     }
 
-    private static String performClustering(int threads, int clusters) {
-        // Mock implementation of clustering logic
-        StringBuilder result = new StringBuilder();
-        result.append("Clustering completed with ").append(threads).append(" threads\n");
-        result.append("Clusters formed: ").append(clusters).append("\n");
-        result.append("Cluster results:\n");
-
-        // Mock cluster data
-        for (int i = 1; i <= clusters; i++) {
-            result.append("Cluster ").append(i).append(": [Sample Data]\n");
-        }
-
-        return result.toString();
-    }
 
     private static void handleEmbeddingsLoading(Scanner scanner, ExecutorService executor) {
         System.out.println("Enter the path to the word embedding file:");
